@@ -122,7 +122,8 @@ body {
 /* ====== 项目详情（有侧边栏） ====== */
 .layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -182,13 +183,8 @@ body {
 
 .main section:last-child {
   flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
-.main section:last-child > *:last-child {
-  flex: 1;
-}
 
 /* ====== 通用组件 ====== */
 section {
