@@ -17,6 +17,7 @@
     "@hono/node-server": "^1.13.8",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "hono": "^4.7.5",
+    "react-router-dom": "^7.18.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {
