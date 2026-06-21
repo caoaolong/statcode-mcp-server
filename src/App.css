@@ -186,6 +186,43 @@ body {
 }
 
 
+/* ====== MCP 工具列表 ====== */
+.tools-section .subtitle {
+  margin-bottom: 0.75rem;
+}
+.tools-section code {
+  background: #f0f0f0;
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+.tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.tool-item {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.tool-name {
+  font-weight: 600;
+  color: #4f46e5;
+  cursor: help;
+  text-decoration: underline dotted #c0c0c0;
+  text-underline-offset: 3px;
+}
+.tool-schema {
+  color: #888;
+  font-size: 0.75rem !important;
+}
+
 /* ====== 通用组件 ====== */
 section {
   background: #fff;
@@ -261,6 +298,116 @@ button:hover {
   font-size: 0.8rem;
   color: #888;
   margin-top: 0.25rem;
+}
+
+/* ====== 项目信息 ====== */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.section-header h2 {
+  margin-bottom: 0;
+}
+.btn-sm {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+}
+.btn-cancel {
+  background: #888;
+}
+.btn-cancel:hover {
+  background: #666;
+}
+
+.info-display {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.info-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.info-label {
+  min-width: 72px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #888;
+  flex-shrink: 0;
+}
+.info-value {
+  font-size: 0.9rem;
+  color: #333;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  white-space: pre-wrap;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  background: #eef0ff;
+  color: #4f46e5;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.info-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.info-editor label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #666;
+}
+.info-editor select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+.info-editor textarea {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.info-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  background: #f5f5f5;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  user-select: none;
+}
+.checkbox-label input[type="checkbox"] {
+  accent-color: #4f46e5;
 }
 
 /* ====== 后缀占比条 ====== */

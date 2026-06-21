@@ -1,21 +1,23 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { z } from 'zod'
 
-export function add(a: number, b: number) {
-  return String(a + b)
+export type McpToolMeta = {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
 }
 
-export function toSlug(text: string) {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
-export function echo(message: string) {
-  return `Echo: ${message}`
-}
+export const toolMetas: McpToolMeta[] = [
+  {
+    name: 'statcode_create_project',
+    description: '创建或获取 Statcode 项目，扫描指定目录的代码统计数据',
+    inputSchema: { path: 'string' },
+  },
+  {
+    name: 'statcode_base_analysis',
+    description: '对项目进行基础分析，补全类型、框架、介绍信息',
+    inputSchema: { id: 'string', description: 'string', frameworks: 'string[]', types: 'string[]' },
+  },
+]
 
 export function createMcpServer() {
   return new McpServer({

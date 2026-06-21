@@ -2,8 +2,9 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { StreamableHTTPTransport } from '@hono/mcp'
-import { createMcpServer, add, toSlug, echo } from './mcp.ts'
-import { readdir, readFile, writeFile, mkdir, stat, rm } from 'node:fs/promises'
+import { createMcpServer, toolMetas } from './mcp.ts'
+import { z } from 'zod'
+import { readdir, readFile, writeFile, mkdir, rm } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, dirname, extname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -27,23 +28,59 @@ app.all('/mcp', async (c) => {
   return transport.handleRequest(c)
 })
 
-// REST API — 供 Web UI 调用
-app.post('/api/add', async (c) => {
-  const { a, b } = await c.req.json()
-  const result = add(a, b)
-  return c.json({ result })
+app.get('/api/mcp-tools', (c) => {
+  return c.json(toolMetas)
 })
 
-app.post('/api/toSlug', async (c) => {
-  const { text } = await c.req.json()
-  const result = toSlug(text)
-  return c.json({ result })
+mcpServer.registerTool('statcode_create_project', { description: '创建或获取 Statcode 项目，扫描指定目录的代码统计数据', inputSchema: { path: z.string() } }, async ({ path }) => {
+  if (!path) {
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: 'path 参数必传' }) }] }
+  }
+  if (!existsSync(path)) {
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `路径不存在: ${path}` }) }] }
+  }
+  const name = basename(path)
+  const dir = join(PROJECTS_DIR, name)
+  const statcodePath = join(dir, '.statcode')
+  let projectId: string
+  try {
+    if (existsSync(dir)) {
+      const existing: StatCodeData = JSON.parse(await readFile(statcodePath, 'utf-8'))
+      projectId = existing.name
+    } else {
+      const { fileCount, codeLines, extensions } = await scanDir(path)
+      const data: StatCodeData = { name, fileCount, codeLines, extensions, frameworks: [], types: [], description: '' }
+      await mkdir(dir, { recursive: true })
+      await writeFile(statcodePath, JSON.stringify(data, null, 2))
+      projectId = data.name
+    }
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ projectId }) }] }
+  } catch (e) {
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: e instanceof Error ? e.message : '未知错误' }) }] }
+  }
 })
 
-app.post('/api/echo', async (c) => {
-  const { message } = await c.req.json()
-  const result = echo(message)
-  return c.json({ result })
+mcpServer.registerTool('statcode_base_analysis', { description: '对项目进行基础分析，补全类型、框架、介绍信息', inputSchema: {
+  id: z.string(),
+  description: z.string(),
+  frameworks: z.array(z.string()),
+  types: z.array(z.string()),
+} }, async ({ id, description, frameworks, types }) => {
+  const statcodePath = join(PROJECTS_DIR, id, '.statcode')
+  if (!existsSync(statcodePath)) {
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `项目 "${id}" 不存在` }) }] }
+  }
+  try {
+    const raw = JSON.parse(await readFile(statcodePath, 'utf-8'))
+    const data = normalizeProjectData(raw)
+    data.description = description
+    data.frameworks = frameworks
+    data.types = types
+    await writeFile(statcodePath, JSON.stringify(data, null, 2))
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ projectId: data.name, frameworks, types, description }) }] }
+  } catch (e) {
+    return { content: [{ type: 'text' as const, text: JSON.stringify({ error: e instanceof Error ? e.message : '未知错误' }) }] }
+  }
 })
 
 // 项目 API
@@ -52,6 +89,21 @@ type StatCodeData = {
   fileCount: number
   codeLines: number
   extensions: Record<string, { count: number; lines: number; percentage: number }>
+  frameworks: string[]
+  types: string[]
+  description: string
+}
+
+function normalizeProjectData(raw: Record<string, unknown>): StatCodeData {
+  return {
+    name: raw.name as string,
+    fileCount: raw.fileCount as number,
+    codeLines: raw.codeLines as number,
+    extensions: raw.extensions as StatCodeData['extensions'],
+    frameworks: (raw.frameworks as string[]) ?? [],
+    types: (raw.types as string[]) ?? (raw.type ? [raw.type as string] : []),
+    description: (raw.description as string) ?? '',
+  }
 }
 
 app.get('/api/projects', async (c) => {
@@ -75,7 +127,25 @@ app.get('/api/projects/:name', async (c) => {
   const statcodePath = join(PROJECTS_DIR, name, '.statcode')
   if (!existsSync(statcodePath)) return c.json({ error: 'not found' }, 404)
   try {
-    const data: StatCodeData = JSON.parse(await readFile(statcodePath, 'utf-8'))
+    const raw = JSON.parse(await readFile(statcodePath, 'utf-8'))
+    return c.json(normalizeProjectData(raw))
+  } catch {
+    return c.json({ error: 'corrupt' }, 500)
+  }
+})
+
+app.patch('/api/projects/:name', async (c) => {
+  const name = c.req.param('name')
+  const statcodePath = join(PROJECTS_DIR, name, '.statcode')
+  if (!existsSync(statcodePath)) return c.json({ error: 'not found' }, 404)
+  try {
+    const raw = JSON.parse(await readFile(statcodePath, 'utf-8'))
+    const data = normalizeProjectData(raw)
+    const body = await c.req.json()
+    if (body.frameworks !== undefined) data.frameworks = body.frameworks
+    if (body.types !== undefined) data.types = body.types
+    if (body.description !== undefined) data.description = body.description
+    await writeFile(statcodePath, JSON.stringify(data, null, 2))
     return c.json(data)
   } catch {
     return c.json({ error: 'corrupt' }, 500)
@@ -137,7 +207,7 @@ app.post('/api/projects', async (c) => {
   const dir = join(PROJECTS_DIR, name)
   if (existsSync(dir)) return c.json({ error: 'project already exists' }, 409)
   const { fileCount, codeLines, extensions } = await scanDir(sourcePath)
-  const data: StatCodeData = { name, fileCount, codeLines, extensions }
+  const data: StatCodeData = { name, fileCount, codeLines, extensions, frameworks: [], types: [], description: '' }
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, '.statcode'), JSON.stringify(data, null, 2))
   return c.json(data, 201)

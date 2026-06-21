@@ -7,7 +7,14 @@ type StatCodeData = {
   fileCount: number
   codeLines: number
   extensions: Record<string, { count: number; lines: number; percentage: number }>
+  frameworks: string[]
+  types: string[]
+  description: string
 }
+
+const PROJECT_TYPES = [
+  '应用客户端', '应用服务端', 'Web服务', 'Web应用', '移动端应用', '系统应用', '小程序应用',
+]
 
 type ProjectSummary = {
   name: string
@@ -15,12 +22,20 @@ type ProjectSummary = {
   codeLines: number
 }
 
+type McpToolMeta = {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+}
+
 // ========= 主页 =========
 function HomePage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [tools, setTools] = useState<McpToolMeta[]>([])
   const navigate = useNavigate()
 
   useEffect(() => { fetch('/api/projects').then(r => r.json()).then(setProjects) }, [])
+  useEffect(() => { fetch('/api/mcp-tools').then(r => r.json()).then(setTools) }, [])
 
   async function createProject() {
     const sourcePath = prompt('服务器上项目的绝对路径:')
@@ -51,6 +66,19 @@ function HomePage() {
         <h1>StatCode</h1>
         <p className="subtitle">代码统计分析</p>
       </header>
+      <section className="tools-section">
+        <h2>MCP 工具</h2>
+        <p className="subtitle">当前 MCP 服务提供的工具，可通过 <code>/mcp</code> 端点调用</p>
+        <div className="tool-list">
+          {tools.map(t => (
+            <div key={t.name} className="tool-item">
+              <span className="tool-name" title={t.description}>{t.name}</span>
+              <code className="tool-schema">{JSON.stringify(t.inputSchema)}</code>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <div className="project-grid">
         {projects.map(p => (
           <div key={p.name} className="project-card">
@@ -84,14 +112,51 @@ function ProjectPage() {
   const navigate = useNavigate()
 
   const [projectData, setProjectData] = useState<StatCodeData | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [editFrameworks, setEditFrameworks] = useState('')
+  const [editTypes, setEditTypes] = useState<string[]>([])
+  const [editDescription, setEditDescription] = useState('')
 
   useEffect(() => {
     if (name) {
       fetch(`/api/projects/${encodeURIComponent(name)}`)
         .then(r => r.ok ? r.json() : null)
-        .then(setProjectData)
+        .then(d => {
+          setProjectData(d)
+          if (d) {
+            setEditFrameworks((d.frameworks ?? []).join(', '))
+            setEditTypes(d.types ?? [])
+            setEditDescription(d.description ?? '')
+          }
+        })
     }
   }, [name])
+
+  function startEdit() {
+    if (!projectData) return
+    setEditFrameworks((projectData.frameworks ?? []).join(', '))
+    setEditTypes(projectData.types ?? [])
+    setEditDescription(projectData.description ?? '')
+    setEditing(true)
+  }
+
+  function toggleType(t: string) {
+    setEditTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
+
+  async function saveEdit() {
+    if (!projectData || !name) return
+    const frameworks = editFrameworks.split(',').map(s => s.trim()).filter(Boolean)
+    const res = await fetch(`/api/projects/${encodeURIComponent(name)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frameworks, types: editTypes, description: editDescription }),
+    })
+    if (res.ok) {
+      setProjectData(await res.json())
+      setEditing(false)
+    }
+  }
 
   const validPages = sidebarPages.map(p => p.key)
   if (!page || !validPages.includes(page)) {
@@ -117,6 +182,56 @@ function ProjectPage() {
       <main className="main">
         {page === 'overview' && projectData && (
           <>
+            <section className="project-info-section">
+              <div className="section-header">
+                <h2>项目信息</h2>
+                {!editing && <button className="btn-sm" onClick={startEdit}>编辑</button>}
+              </div>
+              {editing ? (
+                <div className="info-editor">
+                  <label>框架（多个用逗号分隔）</label>
+                  <input value={editFrameworks} onChange={e => setEditFrameworks(e.target.value)} placeholder="如: React, Vue, Express" />
+                  <label>项目类型（可多选）</label>
+                  <div className="checkbox-group">
+                    {PROJECT_TYPES.map(t => (
+                      <label key={t} className="checkbox-label">
+                        <input type="checkbox" checked={editTypes.includes(t)} onChange={() => toggleType(t)} />
+                        {t}
+                      </label>
+                    ))}
+                  </div>
+                  <label>项目介绍</label>
+                  <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3} placeholder="简单介绍此项目..." />
+                  <div className="info-editor-actions">
+                    <button className="btn-sm btn-cancel" onClick={() => setEditing(false)}>取消</button>
+                    <button className="btn-sm" onClick={saveEdit}>保存</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="info-display">
+                  <div className="info-row">
+                    <span className="info-label">框架</span>
+                    <span className="info-value">
+                      {projectData.frameworks && projectData.frameworks.length > 0
+                        ? projectData.frameworks.map(f => <span key={f} className="tag">{f}</span>)
+                        : <span className="empty">未设置</span>}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">项目类型</span>
+                    <span className="info-value">
+                      {projectData.types && projectData.types.length > 0
+                        ? projectData.types.map(t => <span key={t} className="tag">{t}</span>)
+                        : <span className="empty">未设置</span>}
+                    </span>
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">项目介绍</span>
+                    <span className="info-value">{projectData.description || <span className="empty">未设置</span>}</span>
+                  </div>
+                </div>
+              )}
+            </section>
             <section>
               <h2>概览</h2>
               <div className="overview-stats">
